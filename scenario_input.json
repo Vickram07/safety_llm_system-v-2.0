@@ -1,0 +1,67 @@
+{
+  "timestamp": "2025-12-24T14:30:00Z",
+  "building_id": "HQ-01",
+  "sensors": {
+    "zone_A1": {
+      "type": "temp_humidity",
+      "value_temp_c": 28.5,
+      "value_humidity": 45,
+      "status": "nominal"
+    },
+    "zone_B2": {
+      "type": "smoke_detector",
+      "value_obscuration": 12.5,
+      "threshold": 10.0,
+      "status": "ALERT",
+      "last_calibrated": "2025-11-01"
+    },
+    "zone_B2_temp": {
+      "type": "temp_sensor",
+      "value_temp_c": 55.2,
+      "status": "WARNING"
+    }
+  },
+  "cctv": {
+    "cam_04": {
+      "location": "Zone B2 Hallway",
+      "analysis": "Visual obscuration detected. Possible smoke or dust.",
+      "person_count": 0,
+      "verified_fire": false
+    },
+    "cam_05": {
+      "location": "Zone B2 Stairwell",
+      "analysis": "Clear.",
+      "person_count": 2,
+      "identities": [
+        "UNKNOWN",
+        "UNKNOWN"
+      ]
+    }
+  },
+  "rfid_logs": {
+    "last_seen": [
+      {
+        "id": "VICKRAM_USER",
+        "zone": "Zone A1",
+        "time_offset_seconds": 0,
+        "status": "detected_active"
+      },
+      {
+        "id": "user_492",
+        "zone": "Zone B2",
+        "time_offset_seconds": -30,
+        "status": "unknown"
+      },
+      {
+        "id": "user_110",
+        "zone": "Zone A1",
+        "time_offset_seconds": -5,
+        "status": "safe"
+      }
+    ]
+  },
+  "network_security": {
+    "firewall_status": "active",
+    "unauthorized_access_attempts": 0
+  }
+}
