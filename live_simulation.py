@@ -8,12 +8,14 @@ import sys
 
 # Import our sensor interface
 from sensor_interface import SimulatedSensorProvider, RealSensorProvider
+from sensor_pipeline import model_to_dict
+from model_config import MODEL_NAME as DEFAULT_MODEL_NAME, OLLAMA_GENERATE_URL
 
 # CONFIGURATION
 # ---------------------------------------------------------
 USE_REAL_SENSORS = False # Set to True when you actually have sensors connected
-MODEL_NAME = "safety_llm"
-OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL_NAME = DEFAULT_MODEL_NAME
+OLLAMA_URL = OLLAMA_GENERATE_URL
 # ---------------------------------------------------------
 
 # Setup Logging
@@ -37,7 +39,10 @@ def get_system_prompt():
         with open("live_commander_prompt.txt", "r") as f:
             return f.read()
     except:
-        return "You are a Safety Commander. Give short, urgent commands."
+        return (
+            "You are the INFERNAL X Safety Commander. "
+            "Read the incoming structured sensor packet and reply with a short emergency directive."
+        )
 
 def run_live_system():
     print("==========================================")
@@ -65,7 +70,8 @@ def run_live_system():
     try:
         while True:
             # 1. READ SENSORS
-            current_state = sensors.get_state()
+            current_packet = sensors.get_packet()
+            current_state = model_to_dict(current_packet)
             
             # Print state for debug visibility
             # print(f"\n[DEBUG STATE]: {current_state}")

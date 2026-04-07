@@ -1,39 +1,54 @@
 @import "tailwindcss";
 
-@theme {
-  --color-space-900: #0a0a0f;
-  --color-tech-cyan: #00ffff;
-  --color-tech-green: #00cc66;
-  --color-tech-red: #ff3333;
-  --color-panel: #111218;
-
-  --font-mono: "Space Mono", monospace;
-  --font-sans: "Inter", sans-serif;
-}
-
 @layer base {
-  body {
-    background-color: var(--color-space-900);
-    color: var(--color-slate-300);
-    font-family: var(--font-sans);
-    overflow: hidden;
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
     margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(57, 88, 155, 0.24), transparent 26%),
+      radial-gradient(circle at top right, rgba(15, 94, 122, 0.16), transparent 22%),
+      linear-gradient(180deg, #070b12 0%, #02050a 100%);
+    color: #e6eefb;
+    font-family: "Bahnschrift", "Aptos", "Segoe UI", sans-serif;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
   }
 }
 
-/* Custom Grid Background for the Map */
-.bg-grid {
-  background-size: 50px 50px;
-  background-image:
-    linear-gradient(to right, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
-}
+@layer utilities {
+  .mono-ui {
+    font-family: "Consolas", "Cascadia Mono", "JetBrains Mono", monospace;
+  }
 
-.scrolling-feed::-webkit-scrollbar {
-  width: 4px;
-}
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-.scrolling-feed::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(140, 159, 194, 0.24);
+    border-radius: 999px;
+  }
 }

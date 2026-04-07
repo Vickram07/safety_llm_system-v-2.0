@@ -4,13 +4,13 @@ import os
 import subprocess
 import time
 import requests
+import sys
 from datetime import datetime
+from model_config import MODEL_NAME, FALLBACK_MODEL_NAME, OLLAMA_BASE_URL, OLLAMA_GENERATE_URL
 
 # CONFIGURATION
-MODEL_NAME = "safety_llm"
-BASE_MODEL = "llama3.1" # Fallback if Modelfile mapping fails
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
-OLLAMA_CREATE_URL = "http://localhost:11434/api/create"
+BASE_MODEL = FALLBACK_MODEL_NAME
+OLLAMA_API_URL = OLLAMA_GENERATE_URL
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGS_DIR = os.path.join(PROJECT_DIR, "logs")
 
@@ -45,15 +45,30 @@ def check_ollama():
         logging.error("Ollama execution failed.")
         return False
 
+def model_exists(model_name):
+    try:
+        result = subprocess.run(
+            ["ollama", "show", model_name],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
 def create_model():
-    logging.info("Building custom safety model from Modelfile...")
+    if model_exists(MODEL_NAME):
+        logging.info(f"Using existing Ollama model '{MODEL_NAME}'.")
+        return True
+
+    logging.info("Custom model not found. Building from Modelfile...")
     modelfile_path = os.path.join(PROJECT_DIR, "Modelfile")
     
     # Using specific tag from user request if possible, otherwise rely on Modelfile content
     # We will use the 'ollama create' command.
     try:
-        # We need to read the Modelfile to ensure we are creating exactly what is asked
-        # But ollama create takes the file path.
         cmd = ["ollama", "create", MODEL_NAME, "-f", modelfile_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
@@ -81,17 +96,13 @@ def run_simulation():
         logging.warning("Could not create custom model. Attempting to proceed (model might already exist or we fail gracefully).")
 
     # 2. Load Data
-    system_prompt = read_file("system_prompt.txt")
     scenario_json = read_file("scenario_input.json")
 
-    if not system_prompt or not scenario_json:
-        logging.critical("Missing critical files. Aborting.")
+    if not scenario_json:
+        logging.critical("Missing critical scenario_json file. Aborting.")
         return
 
     # 3. Construct Prompt
-    # We combine system prompt (if not using system param) and input.
-    # Since we are using an API that supports 'system', we will pass it there.
-    
     full_prompt = f"""
 LOG: SIMULATION START
 TIMESTAMP: {datetime.now().isoformat()}
@@ -111,7 +122,6 @@ Provide an advisory recommendation.
     payload = {
         "model": MODEL_NAME,
         "prompt": full_prompt,
-        "system": system_prompt,
         "stream": False,
         "options": {
             "temperature": 0.0 # Reinforcing deterministic behavior
@@ -191,7 +201,7 @@ Provide an advisory recommendation.
                 print(f"Error: {e}")
 
     except requests.exceptions.ConnectionError:
-        logging.error("Could not connect to Ollama. Is the server running? (localhost:11434)")
+        logging.error(f"Could not connect to Ollama. Is the server running? ({OLLAMA_BASE_URL})")
         print("ERROR: Could not connect to Ollama. Make sure 'ollama serve' is running.")
     except Exception as e:
         logging.error(f"Error during inference: {e}")

@@ -1,0 +1,88 @@
+{
+  "building_id": "INFERNALX-HQ",
+  "packet_id": "demo-beta-fire-001",
+  "source": "presentation-demo",
+  "environmental": [
+    {
+      "sensor_id": "temp-beta-01",
+      "zone": "Zone Beta (Engineering)",
+      "sensor_type": "temperature",
+      "value": 79.4,
+      "unit": "C",
+      "status": "ALERT",
+      "confidence": 0.95
+    },
+    {
+      "sensor_id": "smoke-beta-01",
+      "zone": "Zone Beta (Engineering)",
+      "sensor_type": "smoke",
+      "value": 34.5,
+      "unit": "obs",
+      "status": "ALERT",
+      "confidence": 0.97
+    },
+    {
+      "sensor_id": "co-west-01",
+      "zone": "West Corridor",
+      "sensor_type": "co",
+      "value": 68.0,
+      "unit": "ppm",
+      "status": "WARNING",
+      "confidence": 0.88
+    }
+  ],
+  "cameras": [
+    {
+      "camera_id": "cam-beta-01",
+      "zone": "Zone Beta (Engineering)",
+      "flame_score": 0.92,
+      "smoke_score": 0.87,
+      "blockage_score": 0.32,
+      "person_count": 6,
+      "verified_fire": true,
+      "confidence": 0.96,
+      "notes": "Visible flame near engineering workstation cluster."
+    }
+  ],
+  "occupants": [
+    {
+      "occupant_id": "p1",
+      "zone": "Zone Beta (Engineering)",
+      "source": "rfid",
+      "confidence": 0.93,
+      "status": "detected_active"
+    },
+    {
+      "occupant_id": "p2",
+      "zone": "West Corridor",
+      "source": "ble",
+      "confidence": 0.85,
+      "status": "detected_active"
+    },
+    {
+      "occupant_id": "p3",
+      "zone": "Zone Eta (R&D)",
+      "source": "rfid",
+      "confidence": 0.89,
+      "status": "safe"
+    }
+  ],
+  "exits": [
+    {
+      "exit_id": "Exit Beta North",
+      "available": false,
+      "blockage_score": 0.76,
+      "smoke_score": 0.81,
+      "confidence": 0.93
+    }
+  ],
+  "sprinklers": [
+    {
+      "zone": "Zone Beta (Engineering)",
+      "active": false,
+      "flow_rate_lpm": 0.0,
+      "pressure_kpa": 0.0,
+      "confidence": 0.95
+    }
+  ]
+}

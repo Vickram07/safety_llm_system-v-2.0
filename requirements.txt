@@ -5,3 +5,8 @@ pyttsx3
 pygame
 SpeechRecognition
 pyaudio
+crewai
+langgraph
+chromadb
+pydantic
+langchain-ollama

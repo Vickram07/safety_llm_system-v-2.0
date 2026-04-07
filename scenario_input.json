@@ -1,67 +1,99 @@
 {
-  "timestamp": "2025-12-24T14:30:00Z",
-  "building_id": "HQ-01",
-  "sensors": {
-    "zone_A1": {
-      "type": "temp_humidity",
-      "value_temp_c": 28.5,
-      "value_humidity": 45,
-      "status": "nominal"
-    },
-    "zone_B2": {
-      "type": "smoke_detector",
-      "value_obscuration": 12.5,
-      "threshold": 10.0,
+  "building_id": "INFERNALX-HQ",
+  "packet_id": "scenario-fire-001",
+  "source": "scenario-input",
+  "environmental": [
+    {
+      "sensor_id": "temp-beta-01",
+      "zone": "Zone Beta (Engineering)",
+      "sensor_type": "temperature",
+      "value": 76.8,
+      "unit": "C",
       "status": "ALERT",
-      "last_calibrated": "2025-11-01"
+      "confidence": 0.94
     },
-    "zone_B2_temp": {
-      "type": "temp_sensor",
-      "value_temp_c": 55.2,
-      "status": "WARNING"
-    }
-  },
-  "cctv": {
-    "cam_04": {
-      "location": "Zone B2 Hallway",
-      "analysis": "Visual obscuration detected. Possible smoke or dust.",
-      "person_count": 0,
-      "verified_fire": false
+    {
+      "sensor_id": "smoke-beta-01",
+      "zone": "Zone Beta (Engineering)",
+      "sensor_type": "smoke",
+      "value": 31.2,
+      "unit": "obs",
+      "status": "ALERT",
+      "confidence": 0.96
     },
-    "cam_05": {
-      "location": "Zone B2 Stairwell",
-      "analysis": "Clear.",
-      "person_count": 2,
-      "identities": [
-        "UNKNOWN",
-        "UNKNOWN"
-      ]
+    {
+      "sensor_id": "co-west-01",
+      "zone": "West Corridor",
+      "sensor_type": "co",
+      "value": 54.0,
+      "unit": "ppm",
+      "status": "WARNING",
+      "confidence": 0.88
     }
-  },
-  "rfid_logs": {
-    "last_seen": [
-      {
-        "id": "VICKRAM_USER",
-        "zone": "Zone A1",
-        "time_offset_seconds": 0,
-        "status": "detected_active"
-      },
-      {
-        "id": "user_492",
-        "zone": "Zone B2",
-        "time_offset_seconds": -30,
-        "status": "unknown"
-      },
-      {
-        "id": "user_110",
-        "zone": "Zone A1",
-        "time_offset_seconds": -5,
-        "status": "safe"
-      }
-    ]
-  },
-  "network_security": {
-    "firewall_status": "active",
-    "unauthorized_access_attempts": 0
-  }
+  ],
+  "cameras": [
+    {
+      "camera_id": "cam-beta-01",
+      "zone": "Zone Beta (Engineering)",
+      "flame_score": 0.88,
+      "smoke_score": 0.84,
+      "blockage_score": 0.29,
+      "person_count": 5,
+      "verified_fire": true,
+      "confidence": 0.95,
+      "notes": "Smoke and visible flame around engineering row."
+    },
+    {
+      "camera_id": "cam-west-01",
+      "zone": "West Corridor",
+      "flame_score": 0.0,
+      "smoke_score": 0.41,
+      "blockage_score": 0.18,
+      "person_count": 3,
+      "verified_fire": false,
+      "confidence": 0.84,
+      "notes": "Smoke drift entering corridor."
+    }
+  ],
+  "occupants": [
+    {
+      "occupant_id": "p1",
+      "zone": "Zone Beta (Engineering)",
+      "source": "rfid",
+      "confidence": 0.91,
+      "status": "detected_active"
+    },
+    {
+      "occupant_id": "p2",
+      "zone": "West Corridor",
+      "source": "ble",
+      "confidence": 0.86,
+      "status": "detected_active"
+    },
+    {
+      "occupant_id": "p3",
+      "zone": "Zone Eta (R&D)",
+      "source": "rfid",
+      "confidence": 0.88,
+      "status": "safe"
+    }
+  ],
+  "exits": [
+    {
+      "exit_id": "Exit Beta North",
+      "available": false,
+      "blockage_score": 0.73,
+      "smoke_score": 0.79,
+      "confidence": 0.92
+    }
+  ],
+  "sprinklers": [
+    {
+      "zone": "Zone Beta (Engineering)",
+      "active": false,
+      "flow_rate_lpm": 0.0,
+      "pressure_kpa": 0.0,
+      "confidence": 0.95
+    }
+  ]
 }

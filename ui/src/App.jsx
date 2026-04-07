@@ -1,210 +1,384 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Shield, Target, Zap, Clock, Cpu, Droplets, Flame, AlertOctagon, CheckCircle2, ChevronRight, ActivitySquare, ShieldCheck, Siren } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Activity,
+  AlertTriangle,
+  Bot,
+  Cpu,
+  Flame,
+  LayoutTemplate,
+  MapPinned,
+  RefreshCcw,
+  ScanSearch,
+  Send,
+  Shield,
+  ShieldCheck,
+  Siren,
+  Sparkles,
+  Upload,
+  Users,
+  Waves,
+  X,
+} from "lucide-react";
+import "./App.css";
 
-const WEBSOCKET_URL = "ws://localhost:8000/ws";
-
-const ZONES = {
-  "Zone Alpha (Executive)": { x: 100, y: 50, w: 250, h: 200 },
-  "Zone Beta (Engineering)": { x: 350, y: 50, w: 300, h: 200 },
-  "Zone Gamma (Datacenter)": { x: 650, y: 50, w: 250, h: 200 },
-  "Zone Delta (Operations)": { x: 900, y: 50, w: 300, h: 200 },
-  "Zone Epsilon (Logistics)": { x: 1200, y: 50, w: 250, h: 200 },
-  "West Corridor": { x: 100, y: 250, w: 550, h: 150 },
-  "Central Hub": { x: 650, y: 250, w: 250, h: 150 },
-  "East Corridor": { x: 900, y: 250, w: 550, h: 150 },
-  "Zone Zeta (Lobby)": { x: 100, y: 400, w: 250, h: 200 },
-  "Zone Eta (R&D)": { x: 350, y: 400, w: 300, h: 200 },
-  "Zone Theta (Cafeteria)": { x: 650, y: 400, w: 250, h: 200 },
-  "Zone Iota (Medical)": { x: 900, y: 400, w: 300, h: 200 },
-  "Zone Kappa (Security)": { x: 1200, y: 400, w: 250, h: 200 }
+const getApiBase = () => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.location.origin;
 };
 
-const EXITS = {
-  "Exit Alpha North": { x: 200, y: 0, w: 50, h: 50 },
-  "Exit Beta North": { x: 475, y: 0, w: 50, h: 50 },
-  "Exit Delta North": { x: 1025, y: 0, w: 50, h: 50 },
-  "Exit Epsilon North": { x: 1300, y: 0, w: 50, h: 50 },
-  "Exit Zeta South": { x: 200, y: 600, w: 50, h: 50 },
-  "Exit Eta South": { x: 475, y: 600, w: 50, h: 50 },
-  "Exit Iota South": { x: 1025, y: 600, w: 50, h: 50 },
-  "Exit Kappa South": { x: 1300, y: 600, w: 50, h: 50 },
-  "Exit West Hub": { x: 50, y: 300, w: 50, h: 50 },
-  "Exit East Hub": { x: 1450, y: 300, w: 50, h: 50 }
+const getSocketUrl = () => {
+  if (typeof window === "undefined") {
+    return "ws://localhost:8000/ws";
+  }
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${protocol}://${window.location.host}/ws`;
+};
+
+const API_BASE = getApiBase();
+const SOCKET_URL = getSocketUrl();
+
+const quickPromptCategories = {
+  STATUS: [
+    "Status report",
+    "Which zone is most critical?",
+    "How many occupants are trapped?",
+  ],
+  CONTROL: [
+    "Should I deploy suppression now?",
+    "Turn off the fire fast with low water",
+  ],
+  DIAGNOSTIC: [
+    "Show evacuation paths",
+    "Analyze exit blockages",
+    "Recommend resource allocation",
+  ],
+};
+
+const EMPTY_ARRAY = [];
+const EMPTY_OBJECT = {};
+
+const layoutTemplates = {
+  compact_hub: {
+    name: "Compact Hub",
+    population: 48,
+    notes: "Reference-style compact office grid.",
+    zones: {
+      "North Operations": { x: 120, y: 90, w: 330, h: 180 },
+      "Command Center": { x: 490, y: 90, w: 250, h: 180 },
+      "Research Bay": { x: 780, y: 90, w: 310, h: 180 },
+      "Central Corridor": { x: 120, y: 300, w: 970, h: 110 },
+      "South Logistics": { x: 120, y: 450, w: 300, h: 170 },
+      "Medical Room": { x: 450, y: 450, w: 260, h: 170 },
+      "Briefing Hall": { x: 740, y: 450, w: 350, h: 170 },
+    },
+    exits: {
+      "Exit North": { x: 545, y: 30, w: 70, h: 45 },
+      "Exit West": { x: 50, y: 332, w: 50, h: 50 },
+      "Exit East": { x: 1110, y: 332, w: 50, h: 50 },
+      "Exit South": { x: 545, y: 650, w: 70, h: 45 },
+    },
+  },
+  split_wings: {
+    name: "Split Wings",
+    population: 72,
+    notes: "Dual-wing response layout.",
+    zones: {
+      "Alpha Wing": { x: 80, y: 100, w: 280, h: 240 },
+      "Beta Wing": { x: 420, y: 100, w: 280, h: 240 },
+      "Control Spine": { x: 760, y: 100, w: 190, h: 430 },
+      "Gamma Wing": { x: 1010, y: 100, w: 280, h: 240 },
+      "Delta Wing": { x: 80, y: 390, w: 620, h: 160 },
+      "Support Bay": { x: 1010, y: 390, w: 280, h: 160 },
+    },
+    exits: {
+      "Exit A": { x: 170, y: 40, w: 60, h: 45 },
+      "Exit B": { x: 540, y: 40, w: 60, h: 45 },
+      "Exit C": { x: 1110, y: 40, w: 60, h: 45 },
+      "Exit D": { x: 1110, y: 580, w: 60, h: 45 },
+    },
+  },
+};
+
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+const formatStatusTone = (status) => {
+  if (status === "PANIC") return "#ff8a66";
+  if (status === "TRAPPED") return "#ffd166";
+  if (status === "EVACUATING") return "#8fd3ff";
+  return "#63e6be";
 };
 
 export default function App() {
   const [state, setState] = useState(null);
-  const [hoveredPerson, setHoveredPerson] = useState(null);
   const [latency, setLatency] = useState(0);
-
-  // Chat State
-  const [chatHistory, setChatHistory] = useState([
-    { role: 'system', content: 'Connection Established. InfernalX Online and monitoring facility wide thermal integrity. How can I assist you?' }
-  ]);
+  const [selectedPersonId, setSelectedPersonId] = useState(null);
+  const [hoveredPersonId, setHoveredPersonId] = useState(null);
+  const [hoveredScreenPoint, setHoveredScreenPoint] = useState(null);
+  const [chatInput, setChatInput] = useState("");
+  const [charCount, setCharCount] = useState(0);
   const [isChatting, setIsChatting] = useState(false);
-
-  // Camera Pan & Zoom state
+  const [chatHistory, setChatHistory] = useState([
+    {
+      role: "system",
+      content:
+        "InfernalX online. I can summarize the active fire state, recommend suppression, and help normalize a new facility design.",
+    },
+  ]);
+  const [designText, setDesignText] = useState("");
+  const [layoutJson, setLayoutJson] = useState("");
+  const [uploadingLayout, setUploadingLayout] = useState(false);
+  const [layoutFeedback, setLayoutFeedback] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("compact_hub");
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
-  const isDragging = useRef(false);
-  const hasDragged = useRef(false);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+  const [showAdvancedTools, setShowAdvancedTools] = useState(false);
+  const [autonomousMode, setAutonomousMode] = useState(false);
 
   const canvasRef = useRef(null);
-  const lastUpdate = useRef(Date.now());
   const socketRef = useRef(null);
+  const dragStateRef = useRef({ dragging: false, moved: false, x: 0, y: 0 });
+  const lastMessageAtRef = useRef(Date.now());
+  const lastUiStateCommitAtRef = useRef(0);
+  const latestSocketPayloadRef = useRef(null);
+  const queuedSocketTimerRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const lastAutoFitRevisionRef = useRef(null);
+
+  const people = state?.people ?? EMPTY_ARRAY;
+  const hoveredPerson = people.find((person) => person.id === hoveredPersonId) || null;
+  const selectedPerson =
+    people.find((person) => person.id === selectedPersonId) ||
+    null;
+  const zones = state?.zones ?? EMPTY_OBJECT;
+  const exits = state?.exits ?? EMPTY_OBJECT;
+  const sensorZones = state?.sensor_pipeline?.zones ?? EMPTY_OBJECT;
+  const sensorSummary = state?.sensor_pipeline?.summary ?? EMPTY_OBJECT;
+  const blockedExits = state?.blocked_exits ?? EMPTY_ARRAY;
+
+  // Sync autonomous mode state from server
+  useEffect(() => {
+    if (state?.autonomous_mode !== undefined) {
+      setAutonomousMode(state.autonomous_mode);
+    }
+  }, [state?.autonomous_mode]);
 
   useEffect(() => {
-    socketRef.current = new WebSocket(WEBSOCKET_URL);
-    socketRef.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data && data.people) {
-        setState(data);
+    const connect = () => {
+      const socket = new WebSocket(SOCKET_URL);
+      socketRef.current = socket;
+
+      socket.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
         const now = Date.now();
-        setLatency(now - lastUpdate.current);
-        lastUpdate.current = now;
-      }
+        setLatency(now - lastMessageAtRef.current);
+        lastMessageAtRef.current = now;
+
+        latestSocketPayloadRef.current = payload;
+        const minUiGapMs = 66;
+        const elapsedSinceCommit = now - lastUiStateCommitAtRef.current;
+
+        if (elapsedSinceCommit >= minUiGapMs) {
+          setState(payload);
+          lastUiStateCommitAtRef.current = now;
+          return;
+        }
+
+        if (queuedSocketTimerRef.current) {
+          return;
+        }
+
+        queuedSocketTimerRef.current = window.setTimeout(() => {
+          queuedSocketTimerRef.current = null;
+          if (latestSocketPayloadRef.current) {
+            setState(latestSocketPayloadRef.current);
+            lastUiStateCommitAtRef.current = Date.now();
+          }
+        }, Math.max(0, minUiGapMs - elapsedSinceCommit));
+      };
+
+      socket.onclose = () => {
+        reconnectTimerRef.current = window.setTimeout(connect, 1500);
+      };
     };
-    return () => socketRef.current?.close();
+
+    connect();
+
+    return () => {
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+      }
+      if (queuedSocketTimerRef.current) {
+        window.clearTimeout(queuedSocketTimerRef.current);
+      }
+      socketRef.current?.close();
+    };
   }, []);
 
-  const handleTriggerFire = () => {
-    fetch('http://localhost:8000/api/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'spawn_fire', target: 'West Corridor' })
-    });
-  };
-  
-  const handleReset = () => {
-    fetch('http://localhost:8000/api/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'set_scenario', target: 'DEFAULT' })
-    });
-  };
+  useEffect(() => {
+    if (!selectedPerson && people.length && !selectedPersonId) {
+      setSelectedPersonId(people[0].id);
+    }
+  }, [people, selectedPerson, selectedPersonId]);
 
-  const handleWheel = (e) => {
-    e.preventDefault();
-    const zoomFactor = -e.deltaY * 0.001;
-    let newScale = scale * (1 + zoomFactor);
-    newScale = Math.max(0.5, Math.min(newScale, 3));
-    setScale(newScale);
-  };
-
-  const handleMouseDown = (e) => {
-    isDragging.current = true;
-    hasDragged.current = false;
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handleCanvasClick = (e) => {
-    if (hasDragged.current) return;
-    if (!state || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const scaleX = canvasRef.current.width / rect.width;
-    const scaleY = canvasRef.current.height / rect.height;
-
-    const canvasX = (e.clientX - rect.left) * scaleX;
-    const canvasY = (e.clientY - rect.top) * scaleY;
-
-    const worldX = (canvasX - pan.x) / scale;
-    const worldY = (canvasY - pan.y) / scale;
-
-    fetch('http://localhost:8000/api/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'manual_fire', x: worldX, y: worldY })
-    });
-  };
-
-  const handleChatSend = (msg) => {
-    if (!msg.trim() || isChatting) return;
-
-    const newHistory = [...chatHistory, { role: 'user', content: msg }];
-    setChatHistory(newHistory);
-    setIsChatting(true);
-
-    fetch('http://localhost:8000/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg })
-    })
-      .then(res => res.json())
-      .then(data => {
-        setChatHistory([...newHistory, { role: 'system', content: data.response }]);
-        setIsChatting(false);
-      })
-      .catch(() => {
-        setChatHistory([...newHistory, { role: 'system', content: 'Connection to InfernalX framework failed. Ensure server.py is running.' }]);
-        setIsChatting(false);
-      });
-  };
-
-  const handleMouseUpOrLeave = () => {
-    isDragging.current = false;
-  };
-
-  const handleMouseMove = (e) => {
-    if (isDragging.current) {
-      hasDragged.current = true;
-      const dx = e.clientX - lastMousePos.current.x;
-      const dy = e.clientY - lastMousePos.current.y;
-      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
+  useEffect(() => {
+    const revision = state?.layout?.revision;
+    if (!state || !revision || lastAutoFitRevisionRef.current === revision) {
       return;
     }
 
-    if (!state || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const scaleX = canvasRef.current.width / rect.width;
-    const scaleY = canvasRef.current.height / rect.height;
-
-    const canvasX = (e.clientX - rect.left) * scaleX;
-    const canvasY = (e.clientY - rect.top) * scaleY;
-
-    const worldX = (canvasX - pan.x) / scale;
-    const worldY = (canvasY - pan.y) / scale;
-
-    let found = null;
-    for (const p of state.people) {
-      // Don't interact with escaped people (even though backend filters them now, it's good safety)
-      if (p.status === 'ESCAPED') continue;
-      
-      if (Math.hypot(p.x - worldX, p.y - worldY) < (20 / scale)) {
-        found = p;
-        break;
-      }
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
     }
-    setHoveredPerson(found);
+
+    const zoneRects = Object.values(state?.zones ?? {});
+    const exitRects = Object.values(state?.exits ?? {});
+    const allRects = [...zoneRects, ...exitRects];
+    if (!allRects.length) {
+      return;
+    }
+
+    const minX = Math.min(...allRects.map((r) => r.x));
+    const minY = Math.min(...allRects.map((r) => r.y));
+    const maxX = Math.max(...allRects.map((r) => r.x + r.w));
+    const maxY = Math.max(...allRects.map((r) => r.y + r.h));
+
+    const worldWidth = Math.max(1, maxX - minX);
+    const worldHeight = Math.max(1, maxY - minY);
+    const padding = 15;
+    const fitScale = Math.min(
+      canvas.width / (worldWidth + padding * 2),
+      canvas.height / (worldHeight + padding * 2),
+    );
+    const boundedScale = Math.max(0.1, Math.min(20.0, fitScale));
+
+    const worldCenterX = minX + worldWidth / 2;
+    const worldCenterY = minY + worldHeight / 2;
+
+    setScale(boundedScale);
+    setPan({
+      x: canvas.width / 2 - worldCenterX * boundedScale,
+      y: canvas.height / 2 - worldCenterY * boundedScale,
+    });
+
+    lastAutoFitRevisionRef.current = revision;
+  }, [state]);
+
+  const getNextWaypoint = (person) => {
+    if (person?.next_waypoint) return person.next_waypoint;
+    const path = Array.isArray(person?.path) ? person.path : [];
+    if (!path.length) return "NONE";
+    const current = person?.zone;
+    const next = path.find((node) => node && node !== current);
+    return next || path[path.length - 1] || "NONE";
+  };
+
+  const getRoutePreview = (person) => {
+    if (person?.route_preview) return person.route_preview;
+    const path = Array.isArray(person?.path) ? person.path : [];
+    if (!path.length) return "No active route.";
+    const preview = path.slice(0, 4).join(" -> ");
+    return path.length > 4 ? `${preview} -> ...` : preview;
+  };
+
+  const getRouteDestination = (person) => {
+    const path = Array.isArray(person?.path) ? person.path : [];
+    if (!path.length) return "Awaiting route";
+    return path[path.length - 1] || "Awaiting route";
+  };
+
+  const getPersonIndexLabel = (person) => {
+    if (!person) return "#0";
+    if (Number.isFinite(Number(person.member_index))) return `#${Number(person.member_index)}`;
+    const idx = people.findIndex((p) => p.id === person.id);
+    return idx >= 0 ? `#${idx + 1}` : "#0";
+  };
+
+  const getPersonNarrative = (person) => {
+    if (!person) return "No occupant selected.";
+    const nextWaypoint = getNextWaypoint(person);
+    const destination = getRouteDestination(person);
+    if (person.status === "TRAPPED") {
+      return `${person.name} is isolated in ${person.zone}. The system is trying to reopen a safe path and move rescue support toward this block.`;
+    }
+    if (person.status === "PANIC") {
+      return `${person.name} is under stress in ${person.zone} and is being rerouted toward ${destination}. Next waypoint: ${nextWaypoint}.`;
+    }
+    if (person.status === "EVACUATING") {
+      return `${person.name} is moving out from ${person.zone} toward ${destination}. Next waypoint: ${nextWaypoint}.`;
+    }
+    return `${person.name} is stable in ${person.zone} and waiting for the next instruction.`;
+  };
+
+  const parseAssistantResponse = (fullMessage) => {
+    const statusMatch = fullMessage.match(/STATUS:\s*(.+?)(?=MACRO-ACTION:|ACTION:|ADVISORY:|$)/is);
+    const actionMatch = fullMessage.match(/(?:MACRO-ACTION|ACTION):\s*(.+?)(?=ADVISORY:|$)/is);
+    const advisoryMatch = fullMessage.match(/ADVISORY:\s*(.+?)$/is);
+    return {
+      status: statusMatch?.[1]?.trim() || null,
+      action: actionMatch?.[1]?.trim() || null,
+      advisory: advisoryMatch?.[1]?.trim() || null,
+      raw: fullMessage,
+    };
+  };
+
+  const parseEventEntry = (entry) => {
+    const eventText = String(entry || "");
+    const timeMatch = eventText.match(/^\[(\d{2}:\d{2}:\d{2})\]\s*/);
+    const text = eventText.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, "");
+    const upper = text.toUpperCase();
+    let toneClass = "log-entry-system";
+    if (/FIRE|BREACH|BURN|SMOKE/.test(upper)) {
+      toneClass = "log-entry-fire";
+    } else if (/EVACUATE|TRAPPED|EXIT|ROUTE/.test(upper)) {
+      toneClass = "log-entry-evacuation";
+    } else if (/ALERT|CRITICAL|EMERGENCY/.test(upper)) {
+      toneClass = "log-entry-alert";
+    }
+    return {
+      timeLabel: timeMatch?.[1] || "LIVE",
+      text,
+      toneClass,
+    };
   };
 
   useEffect(() => {
-    if (!state || !canvasRef.current) return;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    if (!canvas || !state) {
+      return;
+    }
 
-    // Clean, modern dark mode background 
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Draw base aesthetic layout
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#09090b'); // zinc-950
-    gradient.addColorStop(1, '#18181b'); // zinc-900
-    ctx.fillStyle = gradient;
+
+    ctx.save();
+    ctx.fillStyle = "#05080d";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw subtle dot grid for modern tech feel
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
-    for(let x = 0; x < canvas.width; x += 30) {
-      for(let y = 0; y < canvas.height; y += 30) {
-        ctx.beginPath();
-        ctx.arc(x, y, 1, 0, Math.PI * 2);
-        ctx.fill();
-      }
+
+    ctx.strokeStyle = "rgba(104, 130, 184, 0.12)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 36) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 36) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
     }
     ctx.restore();
 
@@ -212,416 +386,946 @@ export default function App() {
     ctx.translate(pan.x, pan.y);
     ctx.scale(scale, scale);
 
-    // Draw Zones - sleek minimal borders with soft glow
-    Object.entries(ZONES).forEach(([name, z]) => {
-      const isFire = state.active_fire_zones.includes(name);
-      ctx.strokeStyle = isFire ? 'rgba(239, 68, 68, 0.4)' : 'rgba(148, 163, 184, 0.15)'; // slate-400
-      ctx.lineWidth = 1;
-      ctx.fillStyle = isFire ? 'rgba(239, 68, 68, 0.03)' : 'rgba(148, 163, 184, 0.02)';
-      
+    Object.entries(zones).forEach(([name, rect]) => {
+      const isHot = state.active_fire_zones.includes(name);
+      const zoneRisk = Number(sensorZones[name]?.fire_probability ?? 0);
+      const riskStrength = Math.min(zoneRisk / 100, 1);
+      ctx.fillStyle = isHot
+        ? `rgba(201, 82, 69, ${0.18 + riskStrength * 0.2})`
+        : `rgba(30, 40, 56, ${0.66 + riskStrength * 0.12})`;
+      ctx.strokeStyle = isHot
+        ? "rgba(255, 120, 98, 0.9)"
+        : zoneRisk >= 35
+          ? "rgba(255, 177, 107, 0.55)"
+          : "rgba(176, 198, 255, 0.22)";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(z.x, z.y, z.w, z.h, 12);
+      ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 14);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = isFire ? 'rgba(239, 68, 68, 0.8)' : 'rgba(148, 163, 184, 0.6)';
-      ctx.font = '500 12px "Inter", sans-serif';
-      ctx.fillText(name, z.x + 12, z.y + 24);
-    });
-
-    // Draw Exits
-    Object.entries(EXITS).forEach(([name, z]) => {
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.3)';
-      ctx.fillStyle = 'rgba(34, 197, 94, 0.05)';
-      ctx.beginPath();
-      ctx.roundRect(z.x, z.y, z.w, z.h, 8);
-      ctx.fill();
-      ctx.stroke();
-      
-      ctx.fillStyle = 'rgba(34, 197, 94, 0.8)';
-      ctx.font = '600 10px "Inter", sans-serif';
-      ctx.fillText("EXIT", z.x + 12, z.y + 28);
-    });
-
-    // Draw Fire with glowing effect
-    ctx.save();
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = 'rgba(239, 68, 68, 0.6)';
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
-    state.fire_cells.forEach(([gx, gy]) => {
-      ctx.beginPath();
-      ctx.roundRect(gx * 10, gy * 10, 10, 10, 3);
-      ctx.fill();
-    });
-    ctx.restore();
-
-    // Draw Water/Suppression
-    ctx.fillStyle = 'rgba(14, 165, 233, 0.6)'; // sky-500
-    state.water_cells.forEach(([gx, gy]) => {
-      ctx.beginPath();
-      ctx.roundRect(gx * 10, gy * 10, 10, 10, 3);
-      ctx.fill();
-    });
-
-    // Draw People - cleaner dots
-    state.people.forEach(p => {
-      // Skip escaped people from drawing logic entirely
-      if (p.status === 'ESCAPED') return;
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = p.status === 'PANIC' ? '#ef4444' : p.status === 'TRAPPED' ? '#f59e0b' : '#10b981'; // red, amber, emerald
-      ctx.fill();
-
-      // Soft glow for people
-      ctx.shadowBlur = p.status === 'PANIC' ? 8 : 4;
-      ctx.shadowColor = ctx.fillStyle;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      if (hoveredPerson?.id === p.id && p.path && p.path.length > 0) {
+      if (isHot) {
+        ctx.fillStyle = "rgba(255, 194, 168, 0.95)";
         ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        p.path.forEach(nodeName => {
-          let r = ZONES[nodeName] || EXITS[nodeName];
-          if (r) ctx.lineTo(r.x + r.w / 2, r.y + r.h / 2);
-        });
-        ctx.strokeStyle = 'rgba(14, 165, 233, 0.8)'; // sky-500
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.arc(rect.x + 12, rect.y + 12, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // --- NEW OFFICE ECOSYSTEM DETAILS ---
+      // Distinguish Corridor/Spine/Hall vs typical functional rooms
+      const isCorridor = /corridor|spine|hall/i.test(name);
+      
+      if (!isCorridor) {
+        // Draw Desks/Benches
+        ctx.fillStyle = "rgba(100, 150, 200, 0.15)";
+        ctx.strokeStyle = "rgba(100, 150, 200, 0.3)";
+        ctx.lineWidth = 1;
+        const deskW = 34;
+        const deskH = 18;
+        // calculate simple grid of desks
+        const cols = Math.floor((rect.w - 40) / (deskW + 20));
+        const rows = Math.floor((rect.h - 70) / (deskH + 20)); // leave room for door and title
+        const startX = rect.x + (rect.w - cols * (deskW + 20) + 20) / 2;
+        const startY = rect.y + 45;
+        
+        for(let r=0; r<rows; r++) {
+          for(let c=0; c<cols; c++) {
+            const dx = startX + c * (deskW + 20);
+            const dy = startY + r * (deskH + 20);
+            ctx.beginPath();
+            ctx.roundRect(dx, dy, deskW, deskH, 3);
+            ctx.fill();
+            ctx.stroke();
+            // Draw monitors / seats
+            ctx.fillStyle = "rgba(200, 200, 255, 0.2)";
+            ctx.fillRect(dx + 5, dy - 4, 8, 4); // monitor
+            ctx.beginPath();
+            ctx.arc(dx + deskW/2, dy + deskH + 6, 4, 0, Math.PI*2); // chair
+            ctx.fill();
+            ctx.fillStyle = "rgba(100, 150, 200, 0.15)"; // restore
+          }
+        }
+      }
+
+      // Draw Door placeholder (always draw a central door edge towards a likely corridor)
+      ctx.fillStyle = "#27d59b"; // Active door indication
+      const doorWidth = 26;
+      ctx.beginPath();
+      if (rect.w > rect.h) {
+         // bottom door
+         ctx.fillRect(rect.x + rect.w/2 - doorWidth/2, rect.y + rect.h - 2, doorWidth, 5);
+      } else {
+         // right door
+         ctx.fillRect(rect.x + rect.w - 2, rect.y + rect.h/2 - doorWidth/2, 5, doorWidth);
+      }
+
+      // Draw Room Name Title
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.font = "bold 13px 'Inter', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(name.toUpperCase(), rect.x + rect.w / 2, rect.y + 14);
+    });
+
+    Object.entries(exits).forEach(([name, rect]) => {
+      const blocked = blockedExits.includes(name);
+      ctx.fillStyle = blocked ? "rgba(168, 52, 52, 0.2)" : "rgba(35, 131, 95, 0.18)";
+      ctx.strokeStyle = blocked ? "rgba(255, 151, 151, 0.86)" : "rgba(117, 235, 178, 0.82)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 10);
+      ctx.fill();
+      ctx.stroke();
+      if (blocked) {
+        ctx.fillStyle = "rgba(255, 214, 214, 0.96)";
+        ctx.beginPath();
+        ctx.arc(rect.x + rect.w / 2, rect.y + rect.h / 2, 3, 0, Math.PI * 2);
+        ctx.fill();
       }
     });
 
-    // Draw Highlight ring for selection
-    if (hoveredPerson) {
-      ctx.beginPath();
-      ctx.arc(hoveredPerson.x, hoveredPerson.y, 14, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(14, 165, 233, 1)'; // sky-500
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    const maxRenderFireCells = 1100;
+    const fireStep = Math.max(1, Math.ceil(state.fire_cells.length / maxRenderFireCells));
+    const visibleFireCells = state.fire_cells.filter((_, index) => index % fireStep === 0);
 
+    ctx.save();
+    if (state.fire_cells.length > 1500) {
+      ctx.fillStyle = "rgba(255, 120, 74, 0.72)";
+      visibleFireCells.forEach(([gx, gy]) => {
+        ctx.fillRect(gx * 10, gy * 10, 10, 10);
+      });
+    } else {
+      visibleFireCells.forEach(([gx, gy]) => {
+        const x = gx * 10;
+        const y = gy * 10;
+        const glow = ctx.createRadialGradient(x + 5, y + 5, 0, x + 5, y + 5, 11);
+        glow.addColorStop(0, "rgba(255, 228, 164, 0.95)");
+        glow.addColorStop(0.45, "rgba(255, 117, 65, 0.82)");
+        glow.addColorStop(1, "rgba(187, 35, 35, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x + 5, y + 5, 11, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
     ctx.restore();
 
-  }, [state, hoveredPerson, pan, scale]);
+    const maxRenderWaterCells = 900;
+    const waterStep = Math.max(1, Math.ceil(state.water_cells.length / maxRenderWaterCells));
+    const visibleWaterCells = state.water_cells.filter((_, index) => index % waterStep === 0);
+    const waveTick = Date.now() / 220;
+    visibleWaterCells.forEach(([gx, gy]) => {
+      const baseX = gx * 10;
+      const baseY = gy * 10;
+      const pulse = 0.25 + Math.sin((gx + gy) * 0.35 + waveTick) * 0.1;
+      const sprayHeight = 5 + Math.cos((gx * 0.4 + gy * 0.3) + waveTick * 0.8) * 2;
+
+      const glow = ctx.createRadialGradient(baseX + 5, baseY + 5, 0, baseX + 5, baseY + 5, 11);
+      glow.addColorStop(0, `rgba(168, 226, 255, ${0.42 + pulse})`);
+      glow.addColorStop(1, "rgba(79, 172, 255, 0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(baseX + 5, baseY + 5, 11, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(96, 190, 255, ${0.34 + pulse})`;
+      ctx.beginPath();
+      ctx.roundRect(baseX, baseY, 10, 10, 4);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(190, 235, 255, ${0.16 + pulse})`;
+      ctx.beginPath();
+      ctx.roundRect(baseX + 3, baseY - sprayHeight, 4, sprayHeight, 2);
+      ctx.fill();
+    });
+
+    people.forEach((person) => {
+      const tone = formatStatusTone(person.status);
+
+      if (person.path?.length) {
+        ctx.beginPath();
+        ctx.moveTo(person.x, person.y);
+        person.path.forEach((nodeName) => {
+          const rect = zones[nodeName] || exits[nodeName];
+          if (!rect) {
+            return;
+          }
+          ctx.lineTo(rect.x + rect.w / 2, rect.y + rect.h / 2);
+        });
+        ctx.strokeStyle =
+          person.id === selectedPersonId
+            ? "rgba(118, 186, 255, 0.9)"
+            : "rgba(118, 186, 255, 0.35)";
+        ctx.lineWidth = person.id === selectedPersonId ? 2.2 : 1.2;
+        ctx.setLineDash([6, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.beginPath();
+      ctx.arc(person.x, person.y, person.id === selectedPersonId ? 6 : 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = tone;
+      ctx.shadowColor = tone;
+      ctx.shadowBlur = person.id === selectedPersonId ? 14 : 7;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (person.id === selectedPersonId) {
+        ctx.beginPath();
+        ctx.arc(person.x, person.y, 13, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(148, 197, 255, 0.95)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    });
+
+    ctx.restore();
+  }, [state, pan, scale, selectedPersonId, people, zones, exits, sensorZones, blockedExits]);
+
+  const postJson = async (path, body) => {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.message || `Request failed: ${response.status}`);
+    }
+    return payload;
+  };
+
+  const handleCommand = async (action, extra = {}) => {
+    await postJson("/api/command", { action, ...extra });
+  };
+
+  const toggleAutonomousMode = async () => {
+    const next = !autonomousMode;
+    setAutonomousMode(next); // optimistic toggle
+    try {
+      await fetch(`${API_BASE}/api/autonomous-mode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+    } catch {
+      setAutonomousMode(!next); // revert on error
+    }
+  };
+
+  const handleCanvasPointerDown = (event) => {
+    dragStateRef.current = {
+      dragging: true,
+      moved: false,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  const updateHoveredPerson = (event) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !state) {
+      return;
+    }
+
+    const bounds = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / bounds.width;
+    const scaleY = canvas.height / bounds.height;
+    const canvasX = (event.clientX - bounds.left) * scaleX;
+    const canvasY = (event.clientY - bounds.top) * scaleY;
+    const worldX = (canvasX - pan.x) / scale;
+    const worldY = (canvasY - pan.y) / scale;
+
+    const hovered = people.find(
+      (person) => Math.hypot(person.x - worldX, person.y - worldY) <= 18 / scale,
+    );
+    setHoveredPersonId(hovered?.id ?? null);
+    if (hovered) {
+      const relX = event.clientX - bounds.left;
+      const relY = event.clientY - bounds.top;
+      const flipX = relX > bounds.width - 320;
+      const flipY = relY > bounds.height - 220;
+      setHoveredScreenPoint({
+        x: Math.max(12, Math.min(bounds.width - 12, relX)),
+        y: Math.max(12, Math.min(bounds.height - 12, relY)),
+        flipX,
+        flipY,
+      });
+    } else {
+      setHoveredScreenPoint(null);
+    }
+
+    if (dragStateRef.current.dragging) {
+      const dx = event.clientX - dragStateRef.current.x;
+      const dy = event.clientY - dragStateRef.current.y;
+      dragStateRef.current = {
+        dragging: true,
+        moved: true,
+        x: event.clientX,
+        y: event.clientY,
+      };
+      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+    }
+  };
+
+  const handleCanvasPointerUp = async (event) => {
+    const dragState = dragStateRef.current;
+    dragStateRef.current.dragging = false;
+
+    const canvas = canvasRef.current;
+    if (!canvas || !state) {
+      return;
+    }
+
+    const bounds = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / bounds.width;
+    const scaleY = canvas.height / bounds.height;
+    const canvasX = (event.clientX - bounds.left) * scaleX;
+    const canvasY = (event.clientY - bounds.top) * scaleY;
+    const worldX = (canvasX - pan.x) / scale;
+    const worldY = (canvasY - pan.y) / scale;
+
+    const clickedPerson = people.find(
+      (person) => Math.hypot(person.x - worldX, person.y - worldY) <= 18 / scale,
+    );
+
+    if (clickedPerson) {
+      setSelectedPersonId(clickedPerson.id);
+      return;
+    }
+
+    if (!dragState.moved) {
+      await handleCommand("manual_fire", { x: worldX, y: worldY });
+    }
+  };
+
+  const handleWheel = (event) => {
+    event.preventDefault();
+    const nextScale = Math.max(0.55, Math.min(2.4, scale * (1 - event.deltaY * 0.001)));
+    setScale(nextScale);
+  };
+
+  // Abort controller lets us cancel an in-flight chat request when user sends a new message
+  const chatAbortRef = useRef(null);
+  // Unique msg key for live streaming append
+  const streamingIdRef = useRef(0);
+
+  const handleChatSubmit = useCallback(async (presetMessage) => {
+    const message = (presetMessage ?? chatInput).trim();
+    if (!message) return;
+
+    // Cancel any previous in-flight request immediately
+    if (chatAbortRef.current) {
+      chatAbortRef.current.abort();
+      chatAbortRef.current = null;
+    }
+
+    const controller = new AbortController();
+    chatAbortRef.current = controller;
+
+    // Add user message + empty assistant bubble immediately
+    const msgId = ++streamingIdRef.current;
+    setChatHistory((prev) => [
+      ...prev,
+      { role: "user", content: message },
+      { role: "system", content: "", streamId: msgId },
+    ]);
+    setChatInput("");
+    setCharCount(0);
+    setIsChatting(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/chat/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+        signal: controller.signal,
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop();
+        for (const part of parts) {
+          if (!part.startsWith("data: ")) continue;
+          const raw = part.slice(6).trim();
+          if (raw === "[DONE]") break;
+          try {
+            const { token } = JSON.parse(raw);
+            if (token && !controller.signal.aborted) {
+              setChatHistory((prev) =>
+                prev.map((m) =>
+                  m.streamId === msgId ? { ...m, content: m.content + token } : m
+                )
+              );
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        setChatHistory((prev) =>
+          prev.map((m) =>
+            m.streamId === msgId
+              ? { ...m, content: `Error: ${error?.message || "backend unavailable"}` }
+              : m
+          )
+        );
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        chatAbortRef.current = null;
+        setIsChatting(false);
+      }
+    }
+  }, [chatInput]);
+
+  const handleCancelChat = useCallback(() => {
+    if (chatAbortRef.current) {
+      chatAbortRef.current.abort();
+      chatAbortRef.current = null;
+    }
+    setIsChatting(false);
+  }, []);
+
+  const applyTemplate = async () => {
+    setUploadingLayout(true);
+    setLayoutFeedback("");
+    try {
+      const data = await postJson("/api/upload_map", { layout: layoutTemplates[selectedTemplate] });
+      setLayoutFeedback(`Applied template: ${data.layout.name}`);
+      setPan({ x: 0, y: 0 });
+      setScale(1);
+    } catch {
+      setLayoutFeedback("Template application failed.");
+    } finally {
+      setUploadingLayout(false);
+    }
+  };
+
+  const submitDesignText = async () => {
+    if (!designText.trim()) {
+      setLayoutFeedback("Enter a design brief first.");
+      return;
+    }
+    setUploadingLayout(true);
+    setLayoutFeedback("");
+    try {
+      const data = await postJson("/api/upload_map", { design_text: designText });
+      setLayoutFeedback(`Layout normalized: ${data.layout.name}`);
+      setPan({ x: 0, y: 0 });
+      setScale(1);
+    } catch {
+      setLayoutFeedback("Design brief normalization failed.");
+    } finally {
+      setUploadingLayout(false);
+    }
+  };
+
+  const submitLayoutJson = async () => {
+    if (!layoutJson.trim()) {
+      setLayoutFeedback("Paste a structured layout JSON payload first.");
+      return;
+    }
+    setUploadingLayout(true);
+    setLayoutFeedback("");
+    try {
+      const parsed = JSON.parse(layoutJson);
+      const data = await postJson("/api/upload_map", { layout: parsed });
+      setLayoutFeedback(`Structured layout applied: ${data.layout.name}`);
+      setPan({ x: 0, y: 0 });
+      setScale(1);
+    } catch {
+      setLayoutFeedback("Structured layout JSON is invalid or could not be applied.");
+    } finally {
+      setUploadingLayout(false);
+    }
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setUploadingLayout(true);
+    setLayoutFeedback("");
+    try {
+      const image_base64 = await fileToBase64(file);
+      const data = await postJson("/api/upload_map", { image_base64 });
+      if (data.status === "success") {
+        setLayoutFeedback(`Image layout applied: ${data.layout.name}`);
+        setPan({ x: 0, y: 0 });
+        setScale(1);
+      } else {
+        setLayoutFeedback(data.message || "Image upload did not produce a valid layout.");
+      }
+    } catch {
+      setLayoutFeedback("Image upload failed.");
+    } finally {
+      setUploadingLayout(false);
+      event.target.value = "";
+    }
+  };
+
+  const stats = state?.stats ?? {
+    alive: 0,
+    evacuated: 0,
+    trapped: 0,
+    casualties: 0,
+    panicking: 0,
+    active_fires: 0,
+  };
+
+  const activeZone =
+    sensorSummary.highest_risk_zone ||
+    state?.active_fire_zones?.[0] ||
+    "No active fire";
+  const compactMetrics = [
+    { label: "Alive", value: stats.alive, tone: "text-white" },
+    { label: "Evacuated", value: stats.evacuated, tone: "text-blue-200" },
+    { label: "Panicking", value: stats.panicking, tone: "text-orange-200" },
+    { label: "Trapped", value: stats.trapped, tone: "text-amber-200" },
+  ];
+  const latestAssistantMessage =
+    [...chatHistory].reverse().find((entry) => entry.role === "system")?.content ??
+    "Awaiting assistant directive.";
+  const parsedResponse = parseAssistantResponse(latestAssistantMessage);
 
   return (
-    <div className="flex flex-col h-screen bg-[#050508] text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden relative">
-      <div className="absolute inset-0 flex justify-center z-0 pointer-events-none">
-         <div className="w-[1000px] h-[500px] bg-indigo-500/20 blur-[150px] rounded-full opacity-30 -translate-y-1/2"></div>
-      </div>
-      
-      {/* HEADER / TOP NAVBAR */}
-      <header className="flex justify-between items-center px-8 py-5 bg-[#050508]/60 backdrop-blur-2xl border-b border-indigo-500/10 z-20 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative">
-        <div className="flex items-center gap-5">
-          <div className="relative">
-             <div className="absolute inset-0 bg-indigo-500 blur-lg opacity-40 mix-blend-screen"></div>
-             <div className="relative p-3 bg-gradient-to-b from-indigo-500 to-indigo-700 rounded-xl shadow-xl shadow-indigo-500/30 border border-white/20 ring-1 ring-indigo-400/50">
-               <Shield className="text-white w-6 h-6" />
-             </div>
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-white tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-white via-indigo-50 to-slate-400 drop-shadow-sm">AEGIS <span className="font-light text-indigo-400">COMMAND</span> V5</h1>
-            <p className="text-[10px] text-indigo-300 font-bold tracking-[0.25em] uppercase mt-0.5 opacity-80">Enterprise Safety Intelligence</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col text-right mr-4">
-            <span className="text-[9px] text-slate-500 font-bold tracking-widest uppercase mb-1.5 align-middle">Live Status Overview</span>
-            {state?.active_fire_zones?.length > 0 ? (
-              <span className="text-red-400 text-xs font-bold uppercase tracking-wider animate-pulse flex items-center gap-2 bg-red-500/10 px-4 py-1.5 rounded-full border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-                <Siren className="w-4 h-4" /> Thermal Breach active
-              </span>
-            ) : (
-              <span className="text-emerald-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2 bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                <ShieldCheck className="w-4 h-4" /> Systems Nominal
-              </span>
-            )}
-          </div>
-          <button 
-            onClick={handleTriggerFire} 
-            className="px-6 py-2.5 bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 shadow-lg shadow-red-500/20 flex items-center gap-2 ring-1 ring-red-400/50 hover:shadow-red-500/40 hover:-translate-y-0.5"
-          >
-            <AlertOctagon className="w-4 h-4" /> Inject Event
-          </button>
-          <button 
-            onClick={handleReset} 
-            className="px-6 py-2.5 bg-black/40 hover:bg-black/60 text-slate-300 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 backdrop-blur-xl hover:border-white/20 hover:text-white"
-          >
-            Reset Matrix
-          </button>
-        </div>
-      </header>
-
-      {/* MAIN BODY */}
-      <div className="flex flex-1 overflow-hidden relative">
-        
-        {/* LEFT PANEL: VITALS & LOGS */}
-        <div className="w-[360px] shrink-0 bg-[#050508]/80 backdrop-blur-2xl border-r border-indigo-500/10 flex flex-col z-10 shadow-[20px_0_40px_rgba(0,0,0,0.5)] relative">
-          
-          <div className="p-7">
-            <h2 className="text-[10px] font-black text-indigo-400/80 uppercase tracking-[0.2em] mb-5 flex items-center gap-2">
-               <ActivitySquare className="w-4 h-4 text-indigo-400" /> Executive Dashboard
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#0f111a]/60 backdrop-blur-xl border border-white/5 p-5 rounded-2xl flex flex-col hover:bg-[#151824] transition-all duration-300 relative overflow-hidden group shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full translate-x-8 -translate-y-8 group-hover:bg-emerald-500/20 transition-colors duration-500"></div>
-                <span className="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-[0.15em] z-10 flex items-center gap-1.5">Alive</span>
-                <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 z-10 tracking-tight">{state ? state.people.filter(p => p.hp > 0 && p.status !== 'ESCAPED').length : 0}</span>
-                <span className="text-[9px] text-emerald-400 mt-3 font-bold z-10 border border-emerald-500/20 bg-emerald-500/10 w-max px-2.5 py-1 rounded shadow-inner flex items-center gap-1.5 uppercase tracking-widest"><CheckCircle2 className="w-3 h-3"/> Active</span>
+    <div className="app-shell px-2 py-2 lg:px-3 lg:py-3">
+      <div className="mx-auto flex h-[calc(100vh-1rem)] max-w-[1880px] flex-col gap-2 overflow-hidden">
+        <section className="panel top-command-bar shrink-0 rounded-[20px] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="rounded-xl bg-blue-500/16 p-2 text-blue-200">
+                <Shield className="h-4 w-4" />
               </div>
-              
-              <div className="bg-[#0f111a]/60 backdrop-blur-xl border border-white/5 p-5 rounded-2xl flex flex-col hover:bg-[#151824] transition-all duration-300 relative overflow-hidden group shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5">
-                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                 <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 blur-2xl rounded-full translate-x-8 -translate-y-8 group-hover:bg-indigo-500/20 transition-colors duration-500"></div>
-                <span className="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-[0.15em] z-10 flex items-center gap-1.5">Evacuated</span>
-                <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 z-10 tracking-tight">{state ? state.people.filter(p => p.status === 'ESCAPED').length : 0}</span>
-                <span className="text-[9px] text-indigo-400 mt-3 font-bold z-10 border border-indigo-500/20 bg-indigo-500/10 w-max px-2.5 py-1 rounded shadow-inner flex items-center gap-1.5 uppercase tracking-widest">Safe Zone</span>
-              </div>
-              
-              <div className="bg-[#0f111a]/60 backdrop-blur-xl border border-white/5 p-5 rounded-2xl flex flex-col hover:bg-[#151824] transition-all duration-300 relative overflow-hidden group shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5">
-                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                 <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 blur-2xl rounded-full translate-x-8 -translate-y-8 group-hover:bg-amber-500/20 transition-colors duration-500"></div>
-                <span className="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-[0.15em] z-10 flex items-center gap-1.5">Trapped</span>
-                <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 z-10 tracking-tight">{state ? state.people.filter(p => p.status === 'TRAPPED').length : 0}</span>
-                <span className="text-[9px] text-amber-500 mt-3 font-bold z-10 border border-amber-500/20 bg-amber-500/10 w-max px-2.5 py-1 rounded shadow-inner flex items-center gap-1.5 uppercase tracking-widest">Needs Assist</span>
-              </div>
-
-              <div className="bg-[#0f111a]/60 backdrop-blur-xl border border-white/5 p-5 rounded-2xl flex flex-col hover:bg-[#151824] transition-all duration-300 relative overflow-hidden group shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5">
-                 <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                 <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl rounded-full translate-x-8 -translate-y-8 group-hover:bg-red-500/20 transition-colors duration-500"></div>
-                <span className="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-[0.15em] z-10 flex items-center gap-1.5">Casualties</span>
-                <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 z-10 tracking-tight">{state ? state.people.filter(p => p.hp <= 0).length : 0}</span>
-                <span className="text-[9px] text-red-500 mt-3 font-bold z-10 border border-red-500/20 bg-red-500/10 w-max px-2.5 py-1 rounded shadow-inner flex items-center gap-1.5 uppercase tracking-widest">Critical</span>
+              <div>
+                <div className="section-title">INFERNAL X CONTROL GRID</div>
+                <h1 className="text-xl font-extrabold tracking-tight text-white">Fire Suppression + Evacuation</h1>
               </div>
             </div>
-          </div>
-
-          <div className="flex-1 flex flex-col min-h-0 relative">
-            <div className="px-7 py-4 border-t border-b border-indigo-500/10 flex items-center justify-between bg-black/40 backdrop-blur-xl shadow-inner">
-              <h2 className="text-[10px] font-black text-indigo-400/80 uppercase tracking-[0.2em] flex items-center gap-2">
-                <Clock className="w-4 h-4 text-indigo-400" /> Operational Log
-              </h2>
-              <span className="text-[9px] font-bold tracking-widest bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded shadow shadow-indigo-500/20">SYNCED</span>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col-reverse gap-4 bg-black/20">
-              {[...(state?.global_events || [])].reverse().map((log, i) => {
-                const parts = log.split("] ");
-                const time = parts[0] ? parts[0].replace('[', '') : "";
-                const content = parts.slice(1).join("] ") || log;
-                
-                // Regex checks for color coding
-                const isCritical = log.includes("CRITICAL") || log.includes("EMERGENCY") || log.includes("BREACH");
-                const isSystem = log.includes("UPDATE") || log.includes("COMMAND RECEIVED") || log.includes("ONLINE");
-                
-                return (
-                  <div key={i} className="flex gap-4 group">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${isCritical ? 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)] border border-red-300' : isSystem ? 'bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.9)] border border-indigo-300' : 'bg-slate-600 border border-slate-400'}`}></div>
-                      <div className="w-[1px] h-full bg-gradient-to-b from-indigo-500/30 to-transparent mt-2 group-last:hidden"></div>
-                    </div>
-                    <div className="pb-5">
-                      <span className="text-[10px] text-slate-500 font-mono font-bold tracking-widest">{time}</span>
-                      <p className={`text-[13px] leading-relaxed mt-1 font-medium ${isCritical ? 'text-red-300' : isSystem ? 'text-indigo-200' : 'text-slate-400'}`}>
-                        {content}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-              
-              {(!state?.global_events || state.global_events.length === 0) && (
-                <div className="h-full flex flex-col items-center justify-center text-slate-600">
-                  <ActivitySquare className="w-8 h-8 opacity-20 mb-3" />
-                  <span className="text-[11px] font-bold tracking-widest uppercase">Awaiting Matrix Events...</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* CENTER CANVASES */}
-        <div className="flex-1 relative bg-[#09090b] flex items-center justify-center overflow-hidden h-full z-0 p-8">
-          
-          <canvas
-            ref={canvasRef}
-            width={1400}
-            height={600}
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUpOrLeave}
-            onMouseLeave={handleMouseUpOrLeave}
-            onClick={handleCanvasClick}
-            className={`border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden backdrop-blur-md max-w-full h-auto transform-gpu ${hoveredPerson ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
-            style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05)' }}
-          />
-
-          {/* Floating PA Annoucements */}
-          <div className="absolute top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-3 z-50 pointer-events-none">
-             {state?.pa_announcements?.map(pa => (
-                <div key={pa.id} style={{animation: 'slideDown 0.3s ease-out forwards'}} className="flex items-center gap-3 bg-gradient-to-r from-sky-900/90 to-indigo-900/90 border border-sky-400/30 px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl">
-                  <div className="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center shrink-0">
-                    <Zap className="w-4 h-4 text-sky-400" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-sky-400 uppercase tracking-widest block mb-0.5">PA Announcement Active</span>
-                    <span className="text-sm font-medium text-white">{pa.text}</span>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-        </div>
-
-        {/* RIGHT PANEL: INTEL & CHAT */}
-        <div className="w-[400px] shrink-0 bg-[#050508]/80 backdrop-blur-2xl border-l border-indigo-500/10 flex flex-col z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.5)] relative">
-          
-          {/* INTEL PANEL */}
-          <div className="shrink-0 min-h-[160px] border-b border-indigo-500/10 flex flex-col bg-black/40 pb-6 relative overflow-hidden">
-             
-             <div className="px-7 py-4 flex items-center justify-between border-b border-indigo-500/10 bg-indigo-500/5">
-              <h2 className="text-[10px] font-black text-indigo-400/80 uppercase tracking-[0.2em] flex items-center gap-2">
-                <Target className="w-4 h-4 text-emerald-400" /> Telemetry Focus
-              </h2>
-              {hoveredPerson && <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded uppercase font-bold tracking-[0.2em] shadow-[0_0_10px_rgba(16,185,129,0.2)]">Target Acquired</span>}
-            </div>
-            
-            <div className="flex-1 p-7 flex flex-col justify-center relative z-10">
-              {hoveredPerson ? (
-                <div className="flex flex-col gap-6 animate-in fade-in duration-300">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-[9px] font-black text-slate-500 tracking-[0.2em] uppercase mb-1.5">Selected Asset</div>
-                      <div className="text-2xl font-black text-white tracking-tighter shadow-black/50 drop-shadow-md">{hoveredPerson.name}</div>
-                      <div className="text-[11px] font-bold text-indigo-300/80 mt-1.5 flex items-center gap-2 tracking-wide uppercase">
-                        {hoveredPerson.role} <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> UID: {hoveredPerson.id.substr(0,6)}
-                      </div>
-                    </div>
-                    {hoveredPerson.status === 'PANIC' && <div className="p-3 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-2xl border border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.2)]"><Siren className="w-5 h-5 text-red-500 animate-pulse"/></div>}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-[#0f111a]/80 backdrop-blur-md p-4 rounded-2xl border border-white/5 shadow-inner relative overflow-hidden">
-                      <div className={`absolute top-0 right-0 w-12 h-12 blur-xl rounded-full translate-x-4 -translate-y-4 ${hoveredPerson.status === 'PANIC' ? 'bg-red-500/20' : hoveredPerson.status === 'TRAPPED' ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}></div>
-                      <div className="text-[9px] text-slate-500 mb-1.5 font-bold tracking-[0.2em] uppercase">Status</div>
-                      <div className={`text-sm font-black tracking-wider uppercase ${hoveredPerson.status === 'PANIC' ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]' : hoveredPerson.status === 'TRAPPED' ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}>
-                        {hoveredPerson.status}
-                      </div>
-                    </div>
-                    <div className="bg-[#0f111a]/80 backdrop-blur-md p-4 rounded-2xl border border-white/5 shadow-inner relative overflow-hidden">
-                       <div className="absolute top-0 right-0 w-12 h-12 blur-xl rounded-full translate-x-4 -translate-y-4 bg-indigo-500/20"></div>
-                      <div className="text-[9px] text-slate-500 mb-1.5 font-bold tracking-[0.2em] uppercase">Vitals</div>
-                      <div className="text-sm font-black text-white flex items-center justify-between tracking-wider">
-                        {hoveredPerson.hp.toFixed(0)}%
-                        <div className="w-14 h-2 bg-black/60 rounded-full overflow-hidden border border-white/5 shadow-inner">
-                           <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]" style={{width: `${hoveredPerson.hp}%`}}></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="flex flex-wrap gap-1.5">
+              {stats.active_fires > 0 ? (
+                <span className="status-pill bg-red-500/14 text-red-200">
+                  <Siren className="h-3.5 w-3.5" />
+                  Active Incident
+                </span>
               ) : (
-                <div className="flex flex-col items-center justify-center text-indigo-500/30">
-                   <Target className="w-12 h-12 mb-4 stroke-1" />
-                   <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-center max-w-[200px] leading-relaxed">Engage telemetry lock by selecting an asset on the matrix.</p>
-                </div>
+                <span className="status-pill bg-emerald-500/14 text-emerald-200">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  System Stable
+                </span>
               )}
+              <span className="status-pill bg-slate-700/40 text-slate-200">
+                <MapPinned className="h-3.5 w-3.5" />
+                {state?.layout?.name ?? "Default"}
+              </span>
+              <span className="status-pill bg-blue-500/12 text-blue-100 mono-ui">
+                <Waves className="h-3.5 w-3.5" />
+                {Math.max(latency, 0)} ms
+              </span>
             </div>
           </div>
+        </section>
 
-          {/* AI ASSISTANT PANEL */}
-          <div className="flex-1 flex flex-col min-h-0 relative bg-black/40">
-            <div className="px-7 py-5 border-b border-indigo-500/10 flex flex-col gap-2 bg-indigo-500/5 shadow-inner">
-              <div className="flex items-center justify-between">
-                 <h2 className="text-[10px] font-black text-indigo-400/80 tracking-[0.2em] uppercase flex items-center gap-2">
-                   <Cpu className="w-4 h-4 text-indigo-400" /> Overseer Core
-                 </h2>
-                 <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] shadow-sm ${isChatting ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]'}`}>
-                   <div className={`w-1.5 h-1.5 rounded-full ${isChatting ? 'bg-indigo-300 animate-pulse blur-[1px]' : 'bg-emerald-400 shadow-[0_0_5px_#34d399]'}`}></div>
-                   {isChatting ? 'PROCESSING' : 'LINK ESTABLISHED'}
-                 </div>
-              </div>
-              <p className="text-[10px] text-slate-500 leading-relaxed mt-1 font-medium tracking-wide">Natural language deployment active. Awaiting override vectors.</p>
-            </div>
-            
-            <div className="flex-1 p-7 overflow-y-auto flex flex-col gap-6 text-sm scrolling-chat custom-scrollbar bg-black/20">
-              {chatHistory.map((msg, idx) => (
-                <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  {msg.role === 'system' && <span className="text-[9px] text-indigo-400 mb-2 font-black ml-1 uppercase tracking-[0.2em]">InfernalX</span>}
-                  <div className={`shadow-lg px-5 py-4 max-w-[90%] text-[13px] leading-relaxed relative border font-medium tracking-wide ${msg.role === 'user' ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 border-indigo-500 shadow-indigo-500/20 text-white rounded-2xl rounded-tr-sm' : 'bg-gradient-to-br from-[#12141c] to-[#0f111a] border-white/5 shadow-black/50 text-indigo-100 rounded-2xl rounded-tl-sm'}`}>
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              
-              {isChatting && (
-                <div className="flex flex-col items-start">
-                   <span className="text-[9px] text-indigo-400 mb-2 font-black ml-1 uppercase tracking-[0.2em]">InfernalX</span>
-                   <div className="bg-gradient-to-br from-[#12141c] to-[#0f111a] border border-white/5 shadow-black/50 text-slate-400 rounded-2xl rounded-tl-sm px-6 py-5">
-                     <div className="flex gap-2 items-center">
-                       <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce shadow-[0_0_8px_#6366f1]"></span>
-                       <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce shadow-[0_0_8px_#6366f1]" style={{ animationDelay: '0.15s' }}></span>
-                       <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce shadow-[0_0_8px_#6366f1]" style={{ animationDelay: '0.3s' }}></span>
-                     </div>
-                   </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-6 bg-black/40 border-t border-indigo-500/10 backdrop-blur-3xl relative">
-              <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent pointer-events-none"></div>
-              <div className="relative group shadow-2xl">
-                <input
-                  type="text"
-                  className="w-full bg-[#0a0b10]/80 border border-white/10 rounded-xl pl-5 pr-14 py-4 text-[13px] text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium tracking-wide shadow-inner backdrop-blur-xl"
-                  placeholder="Initiate terminal sequence..."
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && e.target.value) {
-                      handleChatSend(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  disabled={isChatting}
-                />
-                <button className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-indigo-500 text-white hover:bg-indigo-400 rounded-lg transition-all shadow-[0_0_15px_rgba(99,102,241,0.4)] disabled:opacity-50"
-                  onClick={(e) => {
-                    const input = e.currentTarget.previousElementSibling;
-                    if (input.value) {
-                      handleChatSend(input.value);
-                      input.value = '';
-                    }
-                  }}
+        <div className="operations-grid min-h-0 flex-1">
+          <aside className="panel-muted rail-left min-h-0 rounded-[22px] p-2.5">
+            <section className="support-block rail-left-top min-h-0">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="section-title">Command Deck</div>
+                <button
+                  className="button-ghost flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs"
+                  onClick={() => setShowAdvancedTools((prev) => !prev)}
                 >
-                  <ChevronRight className="w-4 h-4 stroke-[3]" />
+                  <LayoutTemplate className="h-3.5 w-3.5" />
+                  Tools
                 </button>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                {compactMetrics.map((metric) => (
+                  <div key={metric.label} className="metric-card compact-metric">
+                    <div className="metric-label">{metric.label}</div>
+                    <div className={`mt-1 text-2xl font-extrabold ${metric.tone}`}>{metric.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 rounded-2xl border border-white/6 bg-white/4 p-3">
+                <div className="metric-label">Primary Risk Zone</div>
+                <div className="mt-1 truncate text-sm font-bold text-white">{activeZone}</div>
+                <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
+                  {sensorSummary.highest_probability ?? 0}% fused risk
+                </div>
+              </div>
+              {/* ---- AUTONOMOUS MODE TOGGLE ---- */}
+              <button
+                className="mt-2 flex w-full items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-sm font-bold transition-all duration-300"
+                style={{
+                  borderColor: autonomousMode ? "rgba(34,197,94,0.55)" : "rgba(255,255,255,0.08)",
+                  background: autonomousMode
+                    ? "linear-gradient(135deg, rgba(21,128,61,0.28) 0%, rgba(5,46,22,0.4) 100%)"
+                    : "rgba(255,255,255,0.04)",
+                  color: autonomousMode ? "#86efac" : "#94a3b8",
+                  boxShadow: autonomousMode
+                    ? "0 0 18px rgba(34,197,94,0.25), 0 0 6px rgba(34,197,94,0.1)"
+                    : "none",
+                }}
+                onClick={toggleAutonomousMode}
+                title="Toggle InfernalX Autonomous Mode — AI auto-detects and suppresses fire"
+              >
+                <span className="flex items-center gap-2">
+                  <Cpu
+                    className="h-4 w-4"
+                    style={{ color: autonomousMode ? "#4ade80" : "#64748b" }}
+                  />
+                  <span className="text-xs font-bold uppercase tracking-widest">
+                    Autonomous Mode
+                  </span>
+                </span>
+                {/* Toggle switch visual */}
+                <span
+                  className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-300"
+                  style={{
+                    background: autonomousMode
+                      ? "linear-gradient(90deg, #16a34a, #22c55e)"
+                      : "rgba(71,85,105,0.6)",
+                  }}
+                >
+                  <span
+                    className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition-transform duration-300"
+                    style={{ transform: autonomousMode ? "translateX(18px)" : "translateX(2px)" }}
+                  />
+                </span>
+              </button>
+              {/* Active indicator badge */}
+              {autonomousMode && (
+                <div className="mt-1.5 flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-950/30 px-3 py-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
+                    AI Auto-suppression Active
+                  </span>
+                </div>
+              )}
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  className="button-secondary flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs"
+                  onClick={() => handleCommand("spawn_fire", { target: "West Corridor" })}
+                >
+                  <Flame className="h-3.5 w-3.5" />
+                  Inject Fire
+                </button>
+                <button
+                  className="button-primary flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs"
+                  onClick={() => handleCommand("set_scenario", { target: "DEFAULT" })}
+                >
+                  <RefreshCcw className="h-3.5 w-3.5" />
+                  Reset
+                </button>
+              </div>
+
+            </section>
+
+            <section className="support-block rail-left-bottom min-h-0">
+              <div className="mb-2 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-blue-200" />
+                <div className="section-title">Incident Feed</div>
+              </div>
+              <div className="scrollbar-thin h-full space-y-1.5 overflow-auto pr-1">
+                {[...(state?.global_events ?? [])].reverse().slice(0, 16).map((entry, index) => {
+                  const parsedEntry = parseEventEntry(entry);
+                  return (
+                    <div className={`log-entry ${parsedEntry.toneClass}`} key={`${entry}-${index}`}>
+                      <div className="timeline-dot timeline-dot-enhanced" />
+                      <div className="text-xs leading-5 text-slate-200">
+                        <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                          {parsedEntry.timeLabel}
+                        </span>
+                        {parsedEntry.text}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          </aside>
+
+          <section className="panel hero-map center-map-shell min-h-0 rounded-[24px] p-2.5">
+            <div className="center-map-header mb-1.5 flex items-center justify-between gap-2 px-1">
+              <div className="section-title">Center Response Map</div>
+              <div className="flex items-center gap-1.5">
+                <span className="status-pill bg-blue-500/12 text-blue-100 mono-ui">
+                  <Users className="h-3.5 w-3.5" />
+                  {people.length}
+                </span>
+                <span className="status-pill bg-emerald-500/12 text-emerald-100 mono-ui">
+                  <MapPinned className="h-3.5 w-3.5" />
+                  {Math.max(Object.keys(exits).length - blockedExits.length, 0)} open
+                </span>
+              </div>
+            </div>
+
+            <div className="center-map-stage min-h-0">
+              <div className="canvas-frame map-square relative overflow-hidden p-1.5">
+                <canvas
+                  ref={canvasRef}
+                  width={1600}
+                  height={900}
+                  className="h-full w-full cursor-crosshair rounded-[14px]"
+                  onMouseDown={handleCanvasPointerDown}
+                  onMouseMove={updateHoveredPerson}
+                  onMouseUp={handleCanvasPointerUp}
+                  onMouseLeave={() => {
+                    dragStateRef.current.dragging = false;
+                    setHoveredPersonId(null);
+                    setHoveredScreenPoint(null);
+                  }}
+                  onWheel={handleWheel}
+                />
+
+                {hoveredPerson && hoveredScreenPoint ? (
+                  <div
+                    className="person-hover-card pointer-events-none absolute"
+                    style={{
+                      left: hoveredScreenPoint.x + (hoveredScreenPoint.flipX ? -14 : 14),
+                      top: hoveredScreenPoint.y + (hoveredScreenPoint.flipY ? -14 : 14),
+                      transform: `translate(${hoveredScreenPoint.flipX ? "-100%" : "0%"}, ${hoveredScreenPoint.flipY ? "-100%" : "0%"})`,
+                    }}
+                  >
+                    <div className="person-hover-title">
+                      <div>
+                        <div className="person-hover-name">{hoveredPerson.name}</div>
+                        <div className="person-hover-meta">
+                          {getPersonIndexLabel(hoveredPerson)} | ID {hoveredPerson.id}
+                        </div>
+                      </div>
+                      <div className="person-hover-role">{hoveredPerson.role}</div>
+                    </div>
+                    <div className="person-hover-grid">
+                      <div className="person-hover-item">
+                        <div className="person-hover-label">Status</div>
+                        <div className="person-hover-value" style={{ color: formatStatusTone(hoveredPerson.status) }}>
+                          {hoveredPerson.status}
+                        </div>
+                      </div>
+                      <div className="person-hover-item">
+                        <div className="person-hover-label">HP</div>
+                        <div className="person-hover-value">{hoveredPerson.hp}%</div>
+                      </div>
+                      <div className="person-hover-item person-hover-span">
+                        <div className="person-hover-label">Route</div>
+                        <div className="person-hover-value">{getRoutePreview(hoveredPerson)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="center-map-footer mt-1.5 flex items-center justify-between gap-2 px-1 text-xs text-slate-300">
+              <div>zoom {scale.toFixed(2)}x</div>
+              <div>{blockedExits.length ? `${blockedExits.length} exits blocked` : "all exits active"}</div>
+            </div>
+          </section>
+
+          <aside className="panel-muted rail-right min-h-0 rounded-[22px] p-2.5">
+            <section className="support-block rail-right-top min-h-0">
+              <div className="mb-2 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-blue-200" />
+                <div className="section-title">Routing Log</div>
+              </div>
+              <div className="scrollbar-thin h-full space-y-1.5 overflow-auto pr-1">
+                {[...(state?.global_events ?? [])].reverse().slice(0, 10).map((entry, index) => {
+                  const parsedEntry = parseEventEntry(entry);
+                  return (
+                    <div className={`log-entry ${parsedEntry.toneClass}`} key={`${entry}-right-${index}`}>
+                      <div className="timeline-dot timeline-dot-enhanced" />
+                      <div className="text-xs leading-5 text-slate-200">
+                        <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                          {parsedEntry.timeLabel}
+                        </span>
+                        {parsedEntry.text}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="support-block rail-right-bottom min-h-0 flex flex-col">
+              <div className="mb-2 flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-blue-200" />
+                  <div className="section-title">Autonomous AI Chatbot</div>
+                </div>
+                <div className="status-pill bg-blue-500/12 text-blue-100">
+                  <Bot className="h-3.5 w-3.5" />
+                  {isChatting ? "Thinking" : "Ready"}
+                </div>
+              </div>
+
+              <div className="assistant-mini-log flex-1 min-h-0 space-y-2 overflow-auto pr-2 pb-2 mt-2">
+                {[...chatHistory].map((entry, idx) => {
+                  const raw = String(entry.content || "");
+                  // Handle legacy [INFERNALX DIRECTIVE] structured format
+                  const isDirective = raw.startsWith("[INFERNALX DIRECTIVE]");
+                  let displayText = raw;
+                  if (isDirective) {
+                    // Extract just the advisory/action line for display
+                    const advisoryMatch = raw.match(/ADVISORY:\s*(.+)/is);
+                    const actionMatch = raw.match(/MACRO-ACTION:\s*(.+?)(?:\n|ADVISORY:|$)/is);
+                    const statusMatch = raw.match(/STATUS:\s*(.+?)(?:\n|MACRO-ACTION:|$)/is);
+                    const parts = [];
+                    if (statusMatch) parts.push(statusMatch[1].trim());
+                    if (actionMatch) parts.push(actionMatch[1].trim());
+                    if (advisoryMatch) parts.push(advisoryMatch[1].trim());
+                    displayText = parts.join(" — ") || raw;
+                  }
+                  return (
+                    <div
+                      key={`${entry.role}-${idx}`}
+                      className={
+                        entry.role === "user"
+                          ? "chat-bubble-user ml-auto max-w-[85%]"
+                          : "chat-bubble-system max-w-[92%]"
+                      }
+                    >
+                      {displayText}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="shrink-0 mt-3 border-t border-white/5 pt-3">
+                <div className="relative rounded-2xl border border-white/8 bg-white/3 transition-all focus-within:border-blue-400/40 focus-within:bg-white/5">
+                  <textarea
+                    className="assistant-input-enhanced w-full resize-none bg-transparent px-3.5 py-2.5 text-sm outline-none"
+                    maxLength={320}
+                    placeholder="Ask questions about operations, or trigger actions..."
+                    value={chatInput}
+                    onChange={(event) => {
+                      setChatInput(event.target.value);
+                      setCharCount(event.target.value.length);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        handleChatSubmit();
+                      }
+                    }}
+                  />
+                  <div className="flex items-center justify-between border-t border-white/6 px-3 py-1.5">
+                    <div className="text-xs text-slate-400">{charCount}/320 characters</div>
+                    <div className="flex items-center gap-1.5">
+                      {isChatting && (
+                        <button
+                          className="button-ghost flex items-center gap-1 px-2.5 py-1.5 text-xs text-red-300 border-red-400/25"
+                          onClick={handleCancelChat}
+                        >
+                          <X className="h-3 w-3" />
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        className="button-primary flex items-center gap-1.5 px-3 py-1.5 text-xs"
+                        disabled={!chatInput.trim()}
+                        onClick={() => handleChatSubmit()}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        {isChatting ? "Interrupt" : "Send"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
+
+      {showAdvancedTools ? (
+        <div className="advanced-overlay fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+          <div className="advanced-backdrop absolute inset-0 bg-slate-950/78" onClick={() => setShowAdvancedTools(false)} />
+          <div className="panel advanced-modal relative z-10 max-h-[88vh] w-full max-w-[1500px] overflow-auto rounded-[28px] px-5 py-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="section-title">Advanced Layout Tools</div>
+                <div className="mt-1 text-lg font-bold text-white">Design Normalization and Layout Control</div>
+              </div>
+              <button className="button-ghost flex items-center gap-2 px-4 py-2" onClick={() => setShowAdvancedTools(false)}>
+                <X className="h-4 w-4" />
+                Close
+              </button>
+            </div>
+
+            <div className="advanced-tools-grid grid gap-3 xl:grid-cols-4">
+              <div className="panel-muted rounded-2xl p-4">
+                <label className="metric-label block">Quick Template</label>
+                <select
+                  className="field mt-2"
+                  value={selectedTemplate}
+                  onChange={(event) => setSelectedTemplate(event.target.value)}
+                >
+                  <option value="compact_hub">Compact Hub</option>
+                  <option value="split_wings">Split Wings</option>
+                </select>
+                <button className="button-ghost mt-3 w-full px-4 py-3" disabled={uploadingLayout} onClick={applyTemplate}>
+                  Apply Template
+                </button>
+              </div>
+
+              <div className="panel-muted rounded-2xl p-4">
+                <label className="metric-label block">Design Brief</label>
+                <textarea
+                  className="textarea mt-2"
+                  placeholder="Describe the building design in plain text."
+                  value={designText}
+                  onChange={(event) => setDesignText(event.target.value)}
+                />
+                <button className="button-ghost mt-3 w-full px-4 py-3" disabled={uploadingLayout} onClick={submitDesignText}>
+                  <Sparkles className="mr-2 inline h-4 w-4" />
+                  Normalize With Model
+                </button>
+              </div>
+
+              <div className="panel-muted rounded-2xl p-4">
+                <label className="metric-label block">Structured Layout JSON</label>
+                <textarea
+                  className="textarea mono-ui mt-2 min-h-[148px]"
+                  placeholder='{"name":"My Layout","population":40,"zones":{"Zone A":{"x":100,"y":100,"w":280,"h":180}},"exits":{"Exit 1":{"x":180,"y":40,"w":60,"h":45}}}'
+                  value={layoutJson}
+                  onChange={(event) => setLayoutJson(event.target.value)}
+                />
+                <button className="button-ghost mt-3 w-full px-4 py-3" disabled={uploadingLayout} onClick={submitLayoutJson}>
+                  <ScanSearch className="mr-2 inline h-4 w-4" />
+                  Apply Structured Layout
+                </button>
+              </div>
+
+              <div className="panel-muted rounded-2xl p-4">
+                <label className="metric-label block">Image Layout Upload</label>
+                <label className="button-ghost mt-2 flex cursor-pointer items-center justify-center gap-2 px-4 py-3 text-center">
+                  <Upload className="h-4 w-4" />
+                  Upload Design Image
+                  <input className="hidden" type="file" accept="image/*" onChange={handleImageUpload} />
+                </label>
+                <div className="mt-3 rounded-2xl border border-white/6 bg-white/4 px-4 py-3 text-sm text-slate-300">
+                  {layoutFeedback || "Design normalization feedback will appear here."}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes slideDown {
-          0% { transform: translateY(-20px); opacity: 0; }
-          100% { transform: translateY(0); opacity: 1; }
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-        }
-      `}} />
+      ) : null}
     </div>
   );
 }

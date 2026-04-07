@@ -1,109 +1,100 @@
+/* Premium Glassmorphism and Animations for InfernalX */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+body {
+    background-color: #050505;
+    background-image: 
+        radial-gradient(circle at 15% 50%, rgba(0, 255, 255, 0.05), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(255, 50, 50, 0.05), transparent 25%);
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+    background: rgba(10, 15, 20, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
+    background: transparent;
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(50, 200, 200, 0.3);
-    border-radius: 3px;
+    background: rgba(0, 255, 255, 0.3);
+    border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 255, 0.8);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(50, 200, 200, 0.6);
+/* Ambient Pulse for Header */
+@keyframes ambientGlow {
+    0% { box-shadow: 0 0 15px rgba(0, 255, 255, 0.1); }
+    50% { box-shadow: 0 0 30px rgba(0, 255, 255, 0.3); }
+    100% { box-shadow: 0 0 15px rgba(0, 255, 255, 0.1); }
+}
+
+.header-glow {
+    animation: ambientGlow 4s infinite alternate;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
 }
 
 /* PA System Popup Animation */
 @keyframes paPopupOpen {
-    0% {
-        transform: scale(0.9) translateY(10px);
-        opacity: 0;
-    }
-
-    100% {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes paPopupWave {
-    0% {
-        box-shadow: 0 0 0 0 rgba(255, 51, 51, 0.4);
-    }
-
-    70% {
-        box-shadow: 0 0 0 15px rgba(255, 51, 51, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(255, 51, 51, 0);
-    }
+    0% { transform: scale(0.9) translateY(10px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 
 .pa-popup {
-    animation: paPopupOpen 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-.pa-icon-pulse {
-    animation: paPopupWave 1.5s infinite;
+    animation: paPopupOpen 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    background: rgba(20, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 50, 50, 0.5);
+    border-radius: 12px;
 }
 
 /* POV Overlays */
 .pov-camera #simCanvas {
-    filter: grayscale(100%) contrast(120%) brightness(1.2);
+    filter: grayscale(80%) contrast(140%) brightness(1.1) sepia(20%) hue-rotate(180deg);
 }
-
 .pov-camera::before {
-    content: "REC ●";
+    content: "● REC";
     position: absolute;
-    top: 20px;
-    right: 40px;
-    color: red;
-    font-family: monospace;
-    font-size: 20px;
+    top: 30px;
+    right: 50px;
+    color: #ff3333;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: bold;
     animation: blink 1s infinite;
     z-index: 100;
+    text-shadow: 0 0 10px red;
 }
 
-.pov-camera::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
-    pointer-events: none;
-    z-index: 99;
-    background: repeating-linear-gradient(0deg,
-            rgba(0, 0, 0, 0.1),
-            rgba(0, 0, 0, 0.1) 1px,
-            transparent 1px,
-            transparent 3px);
-}
-
-@keyframes blink {
-    50% {
-        opacity: 0;
-    }
-}
+@keyframes blink { 50% { opacity: 0; } }
 
 .pov-fire #simCanvas {
-    filter: sepia(100%) saturate(1000%) hue-rotate(300deg) contrast(150%) brightness(0.8);
+    filter: sepia(100%) saturate(800%) hue-rotate(320deg) contrast(180%) brightness(0.9);
 }
-
 .pov-fire::before {
-    content: "THERMAL IMAGING";
+    content: "[ THERMAL VISION ACTIVE ]";
     position: absolute;
-    top: 20px;
-    left: 20px;
+    top: 30px;
+    left: 30px;
     color: #ff3333;
-    font-family: monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-weight: bold;
-    font-size: 16px;
+    font-size: 18px;
     z-index: 100;
+    text-shadow: 0 0 15px red;
 }
 
 .pov-admin #simCanvas {
-    filter: contrast(130%) brightness(1.1);
+    filter: contrast(110%) brightness(1.2) saturate(120%);
 }

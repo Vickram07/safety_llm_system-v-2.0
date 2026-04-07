@@ -27,25 +27,33 @@ const MAP_OFFSET_X = 50;
 const MAP_OFFSET_Y = 50;
 const SCALE = 1.0;
 
-// Constants matching server
 const ZONES = {
-    "Zone A1 (Lobby)": { x: 330, y: 70, w: 200, h: 180 },
-    "Zone C1 (Command)": { x: 692, y: 70, w: 200, h: 180 },
-    "Zone A2 (Cafeteria)": { x: 1054, y: 70, w: 200, h: 180 },
-    "Zone B1 (Server)": { x: 330, y: 310, w: 200, h: 180 },
-    "Zone C2 (Medical)": { x: 692, y: 310, w: 200, h: 180 },
-    "Zone B2 (Chem Lab)": { x: 1054, y: 310, w: 200, h: 180 },
-    "Hallway West Top": { x: 530, y: 110, w: 162, h: 100 },
-    "Hallway East Top": { x: 892, y: 110, w: 162, h: 100 },
-    "Hallway West Bot": { x: 530, y: 350, w: 162, h: 100 },
-    "Hallway East Bot": { x: 892, y: 350, w: 162, h: 100 },
-    "Central Spine": { x: 742, y: 250, w: 100, h: 60 }
+    "Zone Alpha (Executive)":   {x:100, y:50,  w:250, h:200},
+    "Zone Beta (Engineering)":  {x:350, y:50,  w:300, h:200},
+    "Zone Gamma (Datacenter)":  {x:650, y:50,  w:250, h:200},
+    "Zone Delta (Operations)":  {x:900, y:50,  w:300, h:200},
+    "Zone Epsilon (Logistics)": {x:1200,y:50,  w:250, h:200},
+    "West Corridor":            {x:100, y:250, w:550, h:150},
+    "Central Hub":              {x:650, y:250, w:250, h:150},
+    "East Corridor":            {x:900, y:250, w:550, h:150},
+    "Zone Zeta (Lobby)":        {x:100, y:400, w:250, h:200},
+    "Zone Eta (R&D)":           {x:350, y:400, w:300, h:200},
+    "Zone Theta (Cafeteria)":   {x:650, y:400, w:250, h:200},
+    "Zone Iota (Medical)":      {x:900, y:400, w:300, h:200},
+    "Zone Kappa (Security)":    {x:1200,y:400, w:250, h:200}
 };
 
 const EXITS = {
-    "North Gate": { x: 742, y: 10, w: 100, h: 60 },
-    "South Gate": { x: 742, y: 490, w: 100, h: 60 },
-    "West Emergency": { x: 280, y: 110, w: 50, h: 100 }
+    "Exit Alpha North":   {x:200,  y:0,   w:50, h:50},
+    "Exit Beta North":    {x:475,  y:0,   w:50, h:50},
+    "Exit Delta North":   {x:1025, y:0,   w:50, h:50},
+    "Exit Epsilon North": {x:1300, y:0,   w:50, h:50},
+    "Exit Zeta South":    {x:200,  y:600, w:50, h:50},
+    "Exit Eta South":     {x:475,  y:600, w:50, h:50},
+    "Exit Iota South":    {x:1025, y:600, w:50, h:50},
+    "Exit Kappa South":   {x:1300, y:600, w:50, h:50},
+    "Exit West Hub":      {x:50,   y:300, w:50, h:50},
+    "Exit East Hub":      {x:1450, y:300, w:50, h:50}
 };
 
 function resizeCanvas() {
@@ -245,19 +253,20 @@ let displayedAnnouncements = new Set();
 function updateUI() {
     if (!simState) return;
 
-    // Roster
-    rosterList.innerHTML = '';
     let isSystemCritical = false;
 
     simState.people.forEach(p => {
-        if (p.hp <= 0 || p.status === "ESCAPED") return;
+        if (p.hp <= 0 || p.status === "ESCAPED") {
+            const existingEl = document.getElementById('roster-' + p.id);
+            if (existingEl) existingEl.remove();
+            return;
+        }
 
-        const div = document.createElement('div');
-        div.className = `p-2 rounded border text-sm font-mono flex justify-between ${p.status === 'PANIC' || p.hp < 50 ? 'bg-red-900/30 border-red-500/50' : 'bg-slate-800/50 border-cyan-900/50'
-            }`;
-
+        let existingEl = document.getElementById('roster-' + p.id);
+        const className = `p-2 rounded border text-sm font-mono flex justify-between ${p.status === 'PANIC' || p.hp < 50 ? 'bg-red-900/30 border-red-500/50' : 'bg-slate-800/50 border-cyan-900/50'}`;
         let statusCol = p.status === 'PANIC' ? 'text-orange-400' : 'text-cyan-400';
-        div.innerHTML = `
+        
+        const innerHTMLCode = `
             <div>
                 <span class="text-white">${p.name}</span>
                 <span class="text-xs text-slate-400 block tracking-tight">ID: ${p.id}</span>
@@ -267,7 +276,17 @@ function updateUI() {
                 <span class="block text-xs text-slate-400">HP: ${Math.floor(p.hp)}</span>
             </div>
         `;
-        rosterList.appendChild(div);
+
+        if (!existingEl) {
+            existingEl = document.createElement('div');
+            existingEl.id = 'roster-' + p.id;
+            existingEl.className = className;
+            existingEl.innerHTML = innerHTMLCode;
+            rosterList.appendChild(existingEl);
+        } else {
+            if (existingEl.className !== className) existingEl.className = className;
+            existingEl.innerHTML = innerHTMLCode;
+        }
 
         if (p.status === "PANIC") isSystemCritical = true;
     });

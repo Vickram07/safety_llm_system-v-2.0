@@ -1,0 +1,42 @@
+project_name: infernalx_fire_smoke_transfer
+task: camera_frame_classification
+status: scaffold_only
+
+data:
+  dataset_root: vision_training/dataset
+  train_manifest: vision_training/dataset/manifests/train.jsonl
+  val_manifest: vision_training/dataset/manifests/val.jsonl
+  test_manifest: vision_training/dataset/manifests/test.jsonl
+  image_size: 224
+  num_classes: 5
+  labels:
+    - clear
+    - fire
+    - smoke
+    - blocked_exit
+    - crowd_risk
+
+training:
+  backbone: resnet50
+  pretrained: true
+  batch_size: 16
+  epochs: 12
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  early_stopping_patience: 3
+  mixed_precision: true
+
+export:
+  checkpoint_dir: vision_training/artifacts/checkpoints
+  export_dir: vision_training/artifacts/exported
+  inference_threshold: 0.55
+
+integration:
+  output_contract:
+    fire_score: float
+    smoke_score: float
+    blockage_score: float
+    person_count: int
+    verified_fire: bool
+    notes: string
+
